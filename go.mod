@@ -1,4 +1,4 @@
-module rime-export
+module github.com/NateScarlet/rime-export
 
 go 1.26.3
 
