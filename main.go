@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"sort"
 	"strings"
 
 	marisa "github.com/pgaskin/go-marisa"
@@ -159,12 +158,7 @@ func exportTable(inputPath, outputPath string) error {
 
 	fmt.Fprintf(os.Stderr, "Traversed %d entries\n", len(allEntries))
 
-	// 5. Sort by weight (descending)
-	sort.Slice(allEntries, func(i, j int) bool {
-		return allEntries[i].Weight > allEntries[j].Weight
-	})
-
-	// 6. Convert 双拼→全拼 and output
+	// 5. Convert 双拼→全拼 and output
 	var out io.Writer = os.Stdout
 	if outputPath != "" {
 		f, err := os.Create(outputPath)
