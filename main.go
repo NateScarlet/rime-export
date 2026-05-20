@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	marisa "github.com/pgaskin/go-marisa"
+	progressbar "github.com/schollz/progressbar/v3"
 )
 
 // Binary format structures (little-endian, matching librime's table.h)
@@ -140,17 +141,16 @@ func exportTable(inputPath, outputPath string) error {
 
 	// 5. Traverse index tree and stream output
 	buf := &buffer{data: data}
-	count := 0
+	bar := progressbar.Default(int64(numEntries), "exporting")
 	for e := range exportEntries(buf, indexAddr, resolveText, resolveSyl) {
+		bar.Add(1)
 		quanpin := convertToQuanpin(e.Code)
 		if quanpin == "" {
 			continue
 		}
 		fmt.Fprintf(out, "%s %s %.0f\n", e.Text, quanpin, e.Weight)
-		count++
 	}
 
-	fmt.Fprintf(os.Stderr, "Exported %d entries\n", count)
 	return nil
 }
 
