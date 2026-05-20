@@ -417,7 +417,7 @@ func spToQuanpin(sp string) string {
 	if len(sp) == 1 {
 		c := sp[0]
 		if f, ok := finalMap[c]; ok {
-			return resolveAmbiguous(f, '.', c)
+			return resolveAmbiguous(f, '.')
 		}
 		return string(c)
 	}
@@ -435,7 +435,7 @@ func spToQuanpin(sp string) string {
 	// Check if first char is a valid initial
 	initialStr, hasInitial := initialMap[first]
 	if hasInitial {
-		fin := resolveAmbiguous(final, first, second)
+		fin := resolveAmbiguous(final, first)
 		return initialStr + fin
 	}
 
@@ -443,7 +443,7 @@ func spToQuanpin(sp string) string {
 	// This handles cases like "aa" = a (啊), "ee" = e (额), "oo" = o (哦)
 	if _, ok1 := finalMap[first]; ok1 {
 		// Zero-initial: the first char is the 韵母
-		fin := resolveAmbiguous(finalMap[first], '.', first)
+		fin := resolveAmbiguous(finalMap[first], '.')
 		return fin
 	}
 
@@ -452,7 +452,7 @@ func spToQuanpin(sp string) string {
 
 // resolveAmbiguous picks the most likely final from an ambiguous set.
 // For now, just returns the first option (simplification).
-func resolveAmbiguous(final string, initial, key byte) string {
+func resolveAmbiguous(final string, initial byte) string {
 	if !strings.Contains(final, "/") {
 		return final
 	}
