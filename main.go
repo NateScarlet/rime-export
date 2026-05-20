@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"os"
 	"strings"
@@ -126,39 +127,7 @@ func exportTable(inputPath, outputPath string) error {
 		return resolveText(sylIDs[sid])
 	}
 
-	// 4. Traverse index tree
-	var allEntries []Entry
-
-	buf := &buffer{data: data}
-
-	// Read from index position
-	buf.pos = indexAddr
-
-	headSize := buf.readU32()
-	for sylID := uint32(0); sylID < headSize; sylID++ {
-		entries := buf.readEntryList(resolveText)
-		nextOff := buf.readI32()
-
-		sylStr := resolveSyl(int32(sylID))
-		for _, e := range entries {
-			allEntries = append(allEntries, Entry{
-				Text:   e.text,
-				Code:   sylStr,
-				Weight: e.weight,
-			})
-		}
-
-		if nextOff != 0 {
-			// next_level OffsetPtr is 4 bytes behind current position
-			nextAddr := buf.pos - 4 + int64(nextOff)
-			traverseTrunk(buf, nextAddr, []int32{int32(sylID)}, 0,
-				resolveText, resolveSyl, &allEntries)
-		}
-	}
-
-	fmt.Fprintf(os.Stderr, "Traversed %d entries\n", len(allEntries))
-
-	// 5. Convert 双拼→全拼 and output
+	// 4. Set up output
 	var out io.Writer = os.Stdout
 	if outputPath != "" {
 		f, err := os.Create(outputPath)
@@ -169,15 +138,19 @@ func exportTable(inputPath, outputPath string) error {
 		out = f
 	}
 
-	for _, e := range allEntries {
+	// 5. Traverse index tree and stream output
+	buf := &buffer{data: data}
+	count := 0
+	for e := range exportEntries(buf, indexAddr, resolveText, resolveSyl) {
 		quanpin := convertToQuanpin(e.Code)
 		if quanpin == "" {
 			continue
 		}
-		// 格式3：拼音 pin|yin 123
 		fmt.Fprintf(out, "%s %s %.0f\n", e.Text, quanpin, e.Weight)
+		count++
 	}
 
+	fmt.Fprintf(os.Stderr, "Exported %d entries\n", count)
 	return nil
 }
 
@@ -241,16 +214,43 @@ func (b *buffer) readEntryList(resolveText func(int32) string) []entryPair {
 	return result
 }
 
-// traverseTrunk traverses TrunkIndex or TailIndex recursively.
-func traverseTrunk(
+// exportEntries returns an iterator over all entries in the index tree.
+func exportEntries(b *buffer, indexAddr int64, resolveText, resolveSyl func(int32) string) iter.Seq[Entry] {
+	return func(yield func(Entry) bool) {
+		b.pos = indexAddr
+		headSize := b.readU32()
+		for sylID := uint32(0); sylID < headSize; sylID++ {
+			entries := b.readEntryList(resolveText)
+			nextOff := b.readI32()
+
+			sylStr := resolveSyl(int32(sylID))
+			for _, e := range entries {
+				if !yield(Entry{Text: e.text, Code: sylStr, Weight: e.weight}) {
+					return
+				}
+			}
+
+			if nextOff != 0 {
+				nextAddr := b.pos - 4 + int64(nextOff)
+				if !traverseTrunkYield(b, nextAddr, []int32{int32(sylID)}, 0,
+					resolveText, resolveSyl, yield) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// traverseTrunkYield traverses TrunkIndex or TailIndex recursively, yielding entries.
+func traverseTrunkYield(
 	b *buffer,
 	addr int64,
 	prefix []int32,
 	depth int,
 	resolveText func(int32) string,
 	resolveSyl func(int32) string,
-	entries *[]Entry,
-) {
+	yield func(Entry) bool,
+) bool {
 	saved := b.pos
 	defer func() { b.pos = saved }()
 
@@ -267,17 +267,17 @@ func traverseTrunk(
 			code := append(append([]int32{}, prefix...), key)
 			codeStr := codeToString(code, resolveSyl)
 			for _, e := range nodeEntries {
-				*entries = append(*entries, Entry{
-					Text:   e.text,
-					Code:   codeStr,
-					Weight: e.weight,
-				})
+				if !yield(Entry{Text: e.text, Code: codeStr, Weight: e.weight}) {
+					return false
+				}
 			}
 
 			if nextOff != 0 {
 				nextAddr := b.pos - 4 + int64(nextOff)
-				traverseTrunk(b, nextAddr, code, depth+1,
-					resolveText, resolveSyl, entries)
+				if !traverseTrunkYield(b, nextAddr, code, depth+1,
+					resolveText, resolveSyl, yield) {
+					return false
+				}
 			}
 		}
 	} else {
@@ -303,13 +303,12 @@ func traverseTrunk(
 
 			code := append(append([]int32{}, prefix...), extra...)
 			codeStr := codeToString(code, resolveSyl)
-			*entries = append(*entries, Entry{
-				Text:   resolveText(textID),
-				Code:   codeStr,
-				Weight: weight,
-			})
+			if !yield(Entry{Text: resolveText(textID), Code: codeStr, Weight: weight}) {
+				return false
+			}
 		}
 	}
+	return true
 }
 
 func codeToString(code []int32, resolveSyl func(int32) string) string {
