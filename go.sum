@@ -1,0 +1,6 @@
+github.com/pgaskin/go-marisa v1.0.2 h1:m8MsdiHsWFl5FeaIhcQU8ubejQyMSVakE/7uBYLOeMY=
+github.com/pgaskin/go-marisa v1.0.2/go.mod h1:p/wxYQSwAtj4CLQLRQt6nArrrfrSxe5oiaAAuOias+k=
+github.com/tetratelabs/wazero v1.10.1 h1:2DugeJf6VVk58KTPszlNfeeN8AhhpwcZqkJj2wwFuH8=
+github.com/tetratelabs/wazero v1.10.1/go.mod h1:DRm5twOQ5Gr1AoEdSi0CLjDQF1J9ZAuyqFIjl1KKfQU=
+golang.org/x/sys v0.35.0 h1:vz1N37gP5bs89s7He8XuIYXpyY0+QlsKmzipCbUtyxI=
+golang.org/x/sys v0.35.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
